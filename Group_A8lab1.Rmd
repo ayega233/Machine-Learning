@@ -1,0 +1,113 @@
+---
+title: "Group_A8"
+author: "Ayesha Gamage-(ayega981)//"
+date: "2023-11-19"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Assignment 1. Handwritten digit recognition with Knearest neighbors.
+
+## Assignment 2. Linear regression and ridge regression.
+```{r get library and create data frame,echo=FALSE,warning=FALSE}
+      library(caret)
+      setwd("D:/MSC/SEMESTER1/732A99 Maching lerning/Exercixe")
+      all_data = read.csv("parkinsons.csv")
+```
+
+```{r devided data to test and train,echo=FALSE}
+        #partition data to train and test (60/40)
+        set.seed(12345)
+        n = dim(all_data)[1]
+        id = sample(1:n, floor(n*0.6))
+        train_data = all_data[id,]
+        test_data = all_data[-id,]
+        
+        #data scalling
+        datapre = preProcess(train_data, method=c("center", "scale"))
+        train_dataS = predict(datapre, train_data)
+        test_dataS = predict(datapre,test_data)
+        
+#linear regression model from the training data 
+        lm_model = lm(motor_UPDRS ~ -1+Jitter.Abs.+Jitter.RAP+Jitter.PPQ5+Jitter.DDP+Shimmer+Shimmer.dB.+Shimmer.APQ3+Shimmer.APQ5+Shimmer.APQ11+Shimmer.DDA+NHR+HNR+RPDE+DFA+PPE,train_dataS)
+        summary(lm_model)
+        para_vector = as.vector(coef(lm_model))
+        
+ # predict test data and training data, fit training data to model
+        train_predictions <- predict(lm_model, newdata = train_dataS)
+        test_predictions <- predict(lm_model, newdata = test_dataS)
+        
+        
+#find MSE training data and test data
+        tran_MSE <- mean((train_dataS$motor_UPDRS - train_predictions)^2)
+        test_MSE <- mean((test_dataS$motor_UPDRS - test_predictions)^2)
+        cat("Training MSE :",tran_MSE)
+        cat("Test MSE :",test_MSE)
+```
+
+Significantly contributed variables found by examine the summery of lm model. In the summery Significant codes given which variable significantly contribute to model. As well as we can get idea about significantly contributed variables by examine the  coefficients and their associated p-values in the summary of model. The p-value indicates the statistical significance of each variable and low p-value (less than 0.05) are considered statistically contributed.
+
+In this example following variables are significantly contributed to prediction,
+Jitter.Abs. ,Shimmer,Shimmer.APQ5,Shimmer.APQ11 ,NHR ,HNR ,DFA,PPE
+
+```{r 3,echo=FALSE}
+loglikelihood  = function(teta,sigma,data){
+        formula = motor_UPDRS ~-1+ Jitter.Abs.+Jitter.RAP+Jitter.PPQ5+Jitter.DDP+Shimmer+Shimmer.dB.+Shimmer.APQ3+Shimmer.APQ5+Shimmer.APQ11+Shimmer.DDA+NHR+HNR+RPDE+DFA+PPE
+        x_matrix = model.matrix(formula,data)
+        #x_matrix = as.matrix(data[,7:21])
+        t<-(as.matrix(teta))
+        return ((-(n/2)*log(2*pi*sigma^2))-((1/2*sigma^2)*sum(((x_matrix %*% t) -data$motor_UPDRS)^2)))
+        
+Ridge <- function(par, data, lambda) {
+       theta = par[1:length(par)-1]
+       sigma = par[length(par)]
+      #get negative log-likelihood from likelyhood function
+       neg_likelihood <- -loglikelihood(theta, sigma, data)
+       ridge_penalty <- lambda * sum(theta^2)
+       total_neg_likelihood <- neg_likelihood + ridge_penalty
+       return(total_neg_likelihood)
+}
+
+RidgeOpt = function(lambda){
+      x_matrix = as.matrix(train_dataS[,7:21])
+      init = c(rep(0, ncol(x_matrix)),0.1)
+      result = optim(par = init,fn = Ridge, data = train_dataS, lambda = lambda,method = "BFGS")
+      return(result)
+}
+
+ find_MSE = function(parameters ,datafm){
+       parama = as.matrix(parameters$par[1:length(parameters$par)-1])
+       predct_train = as.matrix(datafm[,7:21])
+       pred = predct_train%*% parama
+       return(mean((datafm$motor_UPDRS - pred)^2))
+ }
+
+ 
+ DF = function(lambda) {
+      opt_result = RidgeOpt(lambda)
+      theta =  as.matrix(opt_result$par[1:length(opt_result$par)-1])
+      X = as.matrix(train_dataS[,7:21])
+      H <- X %*% solve(t(X) %*% X + lambda * diag(length(theta))) %*% t(X)
+      df <- sum(diag(H))
+      return(df)
+ }
+  
+ train_MSE_1 = find_MSE(opt_result1,train_dataS)
+ train_MSE_100 =find_MSE(opt_result100,train_dataS)
+ train_MSE_1000 =find_MSE(opt_result1000,train_dataS)
+
+ test_MSE_1 = find_MSE(opt_result1,test_dataS)
+ test_MSE_100 =find_MSE(opt_result100,test_dataS)
+ test_MSE_1000 =find_MSE(opt_result1000,test_dataS)
+
+ cat("\u03BB\ :1     training_MSE:",train_MSE_1, "\n")
+ cat("\u03BB\ :100   training_MSE:",train_MSE_100, "\n")
+ cat("\u03BB\ :1000  training_MSE:",train_MSE_1000, "\n")
+ cat("\u03BB\ :1     test_MSE:",test_MSE_1, "\n")
+ cat("\u03BB\ :100   test_MSE:",test_MSE_100, "\n")
+ cat("\u03BB\ :1000  test_MSE:",test_MSE_1000, "\n")
+}
+```
+

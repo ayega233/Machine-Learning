@@ -1,0 +1,182 @@
+---
+title: "Group_A8 Lab 1 Block 2 - ENSEMBLE METHODS AND MIXTURE MODELS"
+author: "Ayesha Gamage-(ayega981)/Muditha Cherangani(mudch175)"
+date: "2023-12-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, warning=FALSE,error=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. ENSEMBLE METHODS
+
+```{r echo=FALSE, warning=FALSE,error=FALSE,message=FALSE}
+library(randomForest)
+library(ggplot2)
+library("reshape2") 
+### random forest and prediction function #########
+randomforestsample <- function(nofdatasets,test_data,tr_datafm,nodesize=25){
+  set.seed(1234)
+  ntrees_values <- c(1, 10, 100)
+  misclassification_errors <- matrix(0, nrow = nofdatasets, ncol =length(ntrees_values))
+for (i in 1:nofdatasets) {
+  formula <- trlabels ~ x1 + x2
+  for (ntrees in 1:length(ntrees_values)) {
+    rf_model <- randomForest(formula, data = tr_datafm, ntree = ntrees_values[ntrees], nodesize = nodesize, keep.forest = TRUE)
+    # Make predictions on the test data
+    predictions <- predict(rf_model, newdata = test_data, type = "response")
+    # Convert predictions to binary (0 or 1)
+    predicted_labels <- as.factor(predictions)
+    # Compute misclassification error
+    misclassification_error <- mean(predicted_labels != test_data$telabels)
+    misclassification_errors[i,ntrees] <- misclassification_error
+  }
+
+}
+  colnames(misclassification_errors) <-ntrees_values
+   cat("Misclassification_errors\n")
+   cat("Mean error when tree 1 >",mean(misclassification_errors[,"1"]),"\n")
+      cat("Mean error when tree 1 >",mean(misclassification_errors[,"10"]),"\n")
+         cat("Mean error when tree 1>",mean(misclassification_errors[,"100"]),"\n")
+   # print(misclassification_errors)
+  return(misclassification_errors)
+}
+
+
+```
+
+## Part a.
+Here used 1000 training data sets of size 100 and Report results for when the random forest has 1, 10 and 100 trees.
+```{r echo=FALSE,warning=FALSE}
+##Repeat the procedure above for 1000 training datasets of size 100
+createRandomForestsA <- function(){
+    #       test data set ###
+    x1<-runif(1000)
+    x2<-runif(1000)
+    tedata<-cbind(x1,x2)
+    y<-as.numeric(x1<x2)
+    telabels<-as.factor(y)
+    plot(x1,x2,col=(y+1),main="x1 and x2")
+    test_data <- data.frame(x1,x2,telabels)
+
+    # training data set ##########
+    
+    x1<-runif(100)
+    x2<-runif(100)
+    trdata<-cbind(x1,x2)
+    y<-as.numeric(x1<x2)
+    trlabels<-as.factor(y)
+    tr_datafm <- data.frame(x1, x2, trlabels)
+
+  randomforestsample(1000,test_data,tr_datafm)
+}
+
+data_for_plot1<-createRandomForestsA()
+
+
+```
+
+### Misclassification_errors part a
+```{r echo=FALSE}
+plot_error <- function(data_for_plot){
+  yyy<-data.frame(data_for_plot)
+yyy$x<-c(1:length(yyy$X1))
+library("reshape2") 
+data_final <- reshape2::melt(yyy, id.vars = "x")
+ggplot(data_final,                 
+       aes(x = x,y = value, col = variable),title(main = "Misclassification_errors")) + geom_line()
+}
+plot_error(data_for_plot1)
+```
+
+
+## part b.
+
+```{r echo=FALSE}
+###Repeat the exercise above but this time use the condition (x1<0.5) i
+createRandomForestsB <- function(){
+  #       test data set ###
+  x1<-runif(1000)
+  x2<-runif(1000)
+  tedata<-cbind(x1,x2)
+  y<-as.numeric(x1<0.5)
+  telabels<-as.factor(y)
+  plot(x1,x2,col=(y+1))
+  test_data <- data.frame(x1,x2,telabels)
+  
+  # training data set ##########
+  
+  x1<-runif(100)
+  x2<-runif(100)
+  trdata<-cbind(x1,x2)
+  y<-as.numeric(x1<0.5)
+  trlabels<-as.factor(y)
+  tr_datafm <- data.frame(x1, x2, trlabels)
+  
+  randomforestsample(1000,test_data,tr_datafm)
+}
+data_for_plot2<-  createRandomForestsB()
+
+```
+
+### Misclassification_errors part b
+```{r echo=FALSE}
+plot_error(data_for_plot2)
+```
+
+
+## Part c.
+```{r echo=FALSE}
+##The condition ((x1<0.5 & x2<0.5)| (x1>0.5 & x2>0.5)) 
+createRandomForestsC <- function(){
+  #       test data set ###
+  x1<-runif(1000)
+  x2<-runif(1000)
+  tedata<-cbind(x1,x2)
+  y<-as.numeric((x1<0.5 & x2<0.5)| (x1>0.5 & x2>0.5))
+  telabels<-as.factor(y)
+  plot(x1,x2,col=(y+1))
+  test_data <- data.frame(x1,x2,telabels)
+  
+  # training data set ##########
+  
+  x1<-runif(100)
+  x2<-runif(100)
+  trdata<-cbind(x1,x2)
+  y<-as.numeric((x1<0.5 & x2<0.5)| (x1>0.5 & x2>0.5))
+  trlabels<-as.factor(y)
+  tr_datafm <- data.frame(x1, x2, trlabels)
+  
+  randomforestsample(1000,test_data,tr_datafm,12)
+}
+data_for_plot3<- createRandomForestsC()
+
+```
+### Misclassification_errors part c
+
+```{r echo=FALSE}
+plot_error(data_for_plot3)
+```
+
+**What happens with the mean error rate when the number of trees in the random forest grows? Why?**
+
+As the number of trees in a random forest grows, the mean error rate tends to decrease. Misclassification_errors plot illustrate clearly that, when number of trees is 1 error is higher than number of trees are 10 and 100. Because Random forest used bagging to reduce variance. Following formula used to compute variances,
+$$
+Var|\frac{1}{B}\sum_{b = 1}^{B}z_{b}| = \frac{1-\rho}{B}{\rho}^2+\rho\sigma^2
+$$
+According to this formula, we can reduce variances by increase number of trees in the forest.Adding more trees may strike a balance between bias and variance. 
+
+**The third dataset represents a slightly more complicated classification problem
+than the first one. Still, you should get better performance for it when using sufficient trees in the random forest. Explain why you get better performance.**
+
+When compere third error graph with other error graph, it also perform as simple data sets.One reason is when B increase the variance is decrease.But the complexity of data can have a significant impact on the variance and $\sigma$ will increase with complexity. Since $\sigma$ increase Var() increased.With the high variances,lead to over fitting. 
+But here we used Random forest and it is combination of decision tree , bagging and decorelation.
+
+ $$
+Random forest = decision tree + bagging + decorelation
+$$
+
+The base models’ predictions can be seen as random variables.Since data set more complicated,in the bagging, reduces the variance of the base model’s predictions without increasing the bias. As well as, by aggregating multiple models, to strike a balance between bias and variance, providing improved generalization performance on complex datasets. There for complex data set also have better performance.
+
+

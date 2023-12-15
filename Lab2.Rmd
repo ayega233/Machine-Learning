@@ -1,0 +1,448 @@
+---
+title: "Lab 2 - Group-A8"
+author: "Ayesha Gamage-(ayega981)/Muditha Cherangani(mudch175)"
+date: "2023-12-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 1. Explicit regularization
+```{r,warning=FALSE,echo=FALSE}
+
+library("caret")
+data <- read.csv('tecator.csv')
+
+# Assuming data is your dataframe
+colnames(data) <- make.names(c("Protein", "Moisture", "Fat"))
+
+# Define y based on the fat levels
+y <- data$Fat
+data <- data[, !(colnames(data) %in% c("Protein", "Moisture", "Fat"))]
+
+X <- data[, !(colnames(data) %in% c("Protein", "Moisture", "Fat"))]
+
+
+# Split the data into training and test sets
+set.seed(12345)
+split <- createDataPartition(y, p = 0.5, list = FALSE)
+X_train <- X[split, ]
+y_train <- y[split]
+X_test <- X[-split, ]
+y_test <- y[-split]
+
+# Fit the linear regression model
+linear_model <- lm(y_train ~ ., data = data.frame(y = y_train, X_train))
+
+# Predict on training and test sets
+y_train_pred <- predict(linear_model, newdata = data.frame(y = y_train, X_train))
+y_test_pred <- predict(linear_model, newdata = data.frame(y = y_test, X_test))
+
+# Calculate training and test errors
+train_error <- mean((y_train - y_train_pred)^2)
+test_error <- mean((y_test - y_test_pred)^2)
+
+# Report the model and errors
+cat("Linear Regression Model:\n")
+cat("Training Error:", train_error, "\n")
+cat("Test Error:", test_error, "\n")
+
+
+
+```
+
+This code uses the lm function to fit a linear regression model to the training data and then predicts on both the training and test sets. quality of fit and prediction by analyzing the R-squared value, coefficients, and comparing the predicted values with the actual values in the test set. A higher R-squared value indicates a better fit, and lower test error suggests better predictive performance. in this case Training Error: 4.125085e-30 and
+Test Error: 9.619311e-30 . Test Error is very low.So this is better predictive performance.A high R-squared value close to 1 suggests a good fit.
+
+
+2.
+```{r,warning=FALSE,echo=FALSE}
+library("glmnet")
+
+# Fit LASSO regression
+lasso_model <- glmnet(X, y, alpha = 1)  # alpha = 1 for LASSO
+
+# Print the cost function for the final model
+cat("Cost Function for LASSO Regression:", lasso_model$dev.ratio[length(lasso_model$dev.ratio)], "\n")
+
+
+
+```
+
+The cost function to be optimized includes the sum of squared errors.
+
+3.
+
+```{r,warning=FALSE,echo=FALSE}
+
+library(glmnet)
+# Convert data to matrix format
+X_train_matrix <- as.matrix(X_train)
+y_train_vector <- as.vector(y_train)
+
+# Fit LASSO regression with cross-validation
+lasso_model <- cv.glmnet(X_train_matrix, y_train_vector, alpha = 1)  # alpha = 1 for LASSO
+plot(lasso_model, xvar = "lambda", label = TRUE)
+selected_lambda <- lasso_model$lambda.min  # Choose the optimal lambda based on cross-validation
+lasso_coefficients <- coef(lasso_model, s = selected_lambda)
+
+cat("Penalty factor for a model with three features:", selected_lambda, "\n")
+```
+
+To fit a LASSO regression model to the training data and visualize how the regression coefficients depend on the log of the penalty factor (log($lambda$)), use the cv.glmnet function from the glmnet package
+
+4.
+```{r,warning=FALSE,echo=FALSE}
+
+library(glmnet)
+# Fit Ridge regression with cross-validation
+ridge_model <- cv.glmnet(X_train_matrix, y_train_vector, alpha = 0 , lambda=seq(0,1,0.001))  # alpha = 0 for Ridge
+
+par(mfrow=c(1,2))  # Set up a 1x2 plot layout for side-by-side comparison
+plot(lasso_model, xvar = "lambda", label = TRUE, main = "LASSO Coefficients vs. log")
+plot(ridge_model, xvar = "lambda", label = TRUE, main = "Ridge Coefficients vs. log")
+
+```
+
+LASSO tends to produce sparse models by setting some coefficients to exactly zero, effectively performing feature selection.Ridge regression, on the other hand, shrinks coefficients towards zero but rarely sets them exactly to zero. It is less effective for feature selection.The choice between LASSO and Ridge depends on goals:
+If want a simpler model with fewer features, LASSO might be more suitable.
+If want to keep all features but regularize their impact, Ridge might be a better choice.
+
+
+5.
+
+```{r,warning=FALSE,echo=FALSE}
+# Assuming X_train and y_train 
+library(glmnet)
+
+# Convert data to matrix format
+X_train_matrix <- as.matrix(X_train)
+y_train_vector <- as.vector(y_train)
+
+# Use cross-validation to find the optimal LASSO model
+lasso_cv_model <- cv.glmnet(X_train_matrix, y_train_vector, alpha = 1)  # alpha = 1 for LASSO
+
+plot(lasso_cv_model)
+
+optimal_lambda <- lasso_cv_model$lambda.min
+num_variables_chosen <- sum(coef(lasso_cv_model, s = optimal_lambda) != 0)
+
+cat("Optimal lambda:", optimal_lambda, "\n")
+cat("Number of Variables Chosen:", num_variables_chosen, "\n")
+
+if (optimal_lambda %in% lasso_cv_model$lambda) {
+  cv_score_optimal <- lasso_cv_model$cvm[which(lasso_cv_model$lambda == optimal_lambda)]
+  index_log_minus_4 <- which(log(lasso_cv_model$lambda) == -4)
+  
+  if (length(index_log_minus_4) > 0) {
+    cv_score_log_minus_4 <- lasso_cv_model$cvm[index_log_minus_4]
+    
+    cat("CV Score for log(lambda) = -4:", cv_score_log_minus_4, "\n")
+    
+    if (cv_score_optimal < cv_score_log_minus_4) {
+      cat("The optimal lambda results in a statistically significantly better prediction than log(lambda) = -4.\n")
+    } else {
+      cat("The optimal lambda does not result in a statistically significantly better prediction than log(lambda) = -4.\n")
+    }
+  } else {
+    cat("log(lambda) = -4 not found in the lambda sequence.\n")
+  }
+} else {
+  cat(" Optimal lambda is not in the vector of lambdas used in cross-validation.\n")
+  cat("Consider using the lambda with the minimum cross-validated error.\n")
+}
+
+lasso_optimal_model <- glmnet(X_train_matrix, y_train_vector, alpha = 1, lambda = optimal_lambda)
+
+# Assuming X_test test data
+X_test_matrix <- as.matrix(X_test)
+
+# Predict on the test set using the optimal model
+y_test_pred_optimal <- predict(lasso_optimal_model, newx = X_test_matrix)
+
+# Create a scatter plot of the original test versus predicted test values
+plot(y_test, y_test_pred_optimal, main = "Scatter Plot of Actual vs. Predicted (Test set)",
+     xlab = "Actual Values", ylab = "Predicted Values")
+
+# Optionally, add a line for perfect predictions (y = x)
+abline(0, 1, col = "red", lty = 2)
+
+```
+The plot of the cross-validated mean squared error (CV score) against log($lambda$) provides insight into the performance of the LASSO model for different values of the regularization parameter. However, determining whether the optimal $lambda$ results in a statistically significantly better prediction than a specific value such as log($lambda$) = -4.The x-axis represents the actual values of test set (y_test).The y-axis represents the predicted values from the LASSO model using the optimal lambda (y_test_pred_optimal).The red dashed line indicates where perfect predictions would lie (a 45-degree line). Points closer to this line indicate more accurate predictions.
+
+
+
+
+
+# Assignment 2. Decision trees and logistic regression for bank marketing
+```{r,echo=FALSE,warning=FALSE}
+  library("rpart")
+  library("tree")
+  library("caret")
+  set.seed(1234)
+  
+  setwd("D:/MSC/SEMESTER1/732A99 Maching lerning/Lab/Lab2")
+  data = read.csv("bank-full.csv", sep = ";",stringsAsFactors = TRUE)
+  all_dataset = data[,-12]
+```
+
+
+```{r,echo=FALSE}
+  #######trainig data set ######
+  set.seed(12345)
+  n=dim(all_dataset)[1]
+  id=sample(1:n, floor(n*0.4))
+  traindata =all_dataset[id,]
+  
+  #############validation data set #########3
+  id1=setdiff(1:n, id)
+  set.seed(12345)
+  id2=sample(id1, floor(n*0.3))
+  validationdata=all_dataset[id2,]
+  
+  ###### test data ###########
+  id3=setdiff(id1,id2)
+  test=all_dataset[id3,] 
+```
+
+
+### a. Decision Tree with default settings
+```{r,echo=FALSE}
+n=dim(traindata)[1]
+
+#### decision trees for taining data
+### Part a ##############################################################
+fit_a=tree::tree(as.factor(y)~., data=traindata)
+plot(fit_a)
+text(fit_a, pretty=0)
+```
+
+### b. Decision Tree with smallest allowed node size equal to 7000.
+```{r,echo=FALSE}
+### Part b ##############################################################
+fit_b=tree::tree(as.factor(y)~., data=traindata,control = tree.control(nobs =n ,minsize = 7000))
+plot(fit_b)
+text(fit_b, pretty=0)
+```
+
+### c. Decision trees minimum deviance to 0.0005.
+```{r,echo=FALSE}
+
+### Part c ##############################################################
+fit_c=tree::tree(as.factor(y)~., data=traindata,control = tree.control(nobs =n ,mindev = 0.0005))
+plot(fit_c)
+# text(fit_c, pretty=0)
+```
+
+### 3.Using training and validation sets to choose the optimal tree depth
+```{r,echo=FALSE}
+##########get misclassification rate
+misclas_rate = function(fit_t,data_t){
+  Yfit=predict(fit_t, newdata=data_t,type = "class")
+  conf_matrix_va=table(data_t$y,Yfit)
+  misclassification_rate <- (conf_matrix_va[2,1] + conf_matrix_va[1,2]) / sum(conf_matrix_va)
+  return(misclassification_rate)
+}
+
+########misclassification rates for the training data
+
+########part a
+misclassification_rate_ta=misclas_rate(fit_a,traindata)
+
+########part b
+misclassification_rate_tb=misclas_rate(fit_b,traindata)
+
+########part c
+misclassification_rate_tc=misclas_rate(fit_c,traindata)
+
+########misclassification rates for the validation data
+########part a
+misclassification_rate_va=misclas_rate(fit_a,validationdata)
+
+########part b
+misclassification_rate_vb=misclas_rate(fit_b,validationdata)
+
+########part c
+misclassification_rate_vc=misclas_rate(fit_c,validationdata)
+
+result_table <- data.frame(Train_error = c(misclassification_rate_ta,misclassification_rate_tb,misclassification_rate_tc),
+                           Valid_error = c(misclassification_rate_va,misclassification_rate_vb,misclassification_rate_vc))
+rownames(result_table) <- c("Default", "Nodesize_7000", "Mindev_0.0005")
+
+knitr::kable(result_table, caption = "Misclassification Rate")
+
+```
+According to the misclassification rates above ,the Default and Nodesize_7000 models can be regarded as the best ones. In these two models, the Valid_errors are small than the Mindev_0.0005 model and Mindev_0.0005 model's Valid_errors larger. 
+
+```{r,echo=FALSE}
+#########The optimal tree depth##########
+## model 2c is fit_c
+trainScore=numeric(48)
+validScope=numeric(48)
+for(i in 2:50) {
+  prunedTree=prune.tree(fit_c,best=i)
+  pred=predict(prunedTree, newdata=validationdata,type="tree")
+  trainScore[i-1]=deviance(prunedTree)
+  validScope[i-1]=deviance(pred)
+}
+plot(2:50, trainScore[2:50], col="red", ylim = c(7000,15000),main = "Deviances of training and validation data with number of leaves")
+lines(2:50, validScope[2:50],  col="blue",lwd=2)
+legend("topright", legend = c("Training", "Validation"), col = c("red", "blue"),lty = 1)
+```
+Examine the plot, Deviance are decrease when numbers of leaves increases.But after about 21 it has little increase. This is because
+as the number of leaves increase, the tree model becomes more and more complex. In here we can take optimal leave when Deviance is minimum.
+
+```{r,echo=FALSE}
+### find optimal tree
+optimal_leaves <- which.min(validScope)
+cat("Optimal number of leaves", optimal_leaves)
+```
+
+### 4.Confusion matrix
+
+```{r,echo=FALSE}
+######confusion matrix ###########
+optimal_tree <- tree::tree(as.factor(y)~., data = test,control = tree.control(nobs = n,mincut = optimal_leaves))
+Yfit_f=predict(optimal_tree, newdata=test,type="class")
+conf_m = confusionMatrix(test$y,Yfit_f)
+conf_m$table
+accuracy = conf_m$overall["Accuracy"]
+cat("\nAccuracy ",accuracy,"\n")
+f1_score = conf_m$byClass["F1"]
+cat("F1 score ",f1_score)
+```
+Accuracy of the optimal model is about 0.9.This model has good predictability.
+
+```{r,echo=FALSE}
+######confusion matrix ###########
+summary(optimal_tree)
+```
+According to this summery "poutcome" ,"month", "contact" and "housing" variables are the most important.
+
+### 5.A decision tree classification
+```{r,echo=FALSE}
+######## decision tree classification#########
+loss_matrix = matrix(c(0, 1, 5, 0), nrow = 2)
+tree_model <- rpart(as.factor(y)~., data = test, method = "class",parms = list(loss = loss_matrix))
+Yfit_f1=predict(tree_model, newdata=test,type="class")
+conf_m1 = confusionMatrix(test$y,Yfit_f1)
+conf_m1$table
+accuracy1 = conf_m1$overall["Accuracy"]
+cat("\nAccuracy ",accuracy1,"\n")
+f1_score1 = conf_m1$byClass["F1"]
+cat("F1 score ",f1_score1)
+```
+
+```{r,echo=FALSE}
+#########The optimal tree depth##########
+## model 2c is fit_c
+trainScore=numeric(50)
+validScope=numeric(50)
+for(i in 1:50) {
+  prunedTree=prune.tree(fit_c,best=i+1)
+  pred=predict(prunedTree, newdata=validationdata,type="tree")
+  trainScore[i]=deviance(prunedTree)
+  validScope[i]=deviance(pred)
+}
+plot(1:50, trainScore[1:50], col="red", ylim = c(7000,15000))
+points(1:50, validScope[1:50], type="b", col="blue")
+
+legend("topright", legend = c("Training", "Validation"), col = c("red", "blue"),lty = 1)
+
+```
+
+
+```{r,echo=FALSE}
+### find optimal tree
+optimal_leaves <- which.min(validScope)
+cat("Optimal leave is, ",optimal_leaves ,"\n")
+```
+
+4.
+```{r,echo=FALSE}
+######confusion matrix ###########
+#optimalTree=prune.tree(fit_c, best=optimal_leaves)
+library("caret")
+optimal_tree <- tree::tree(as.factor(y)~., data = test,control = tree.control(nobs = n,mincut = optimal_leaves))
+Yfit_f=predict(optimal_tree, newdata=test,type="class")
+conf_mat = confusionMatrix(Yfit_f,test$y)
+conf_mat$table
+ conf_mat$overall["Accuracy"]
+ conf_mat$byClass["F1"]
+```
+
+
+5.
+```{r,echo=FALSE}
+loss_matrix = matrix(c(0, 1, 5, 0), nrow = 2,ncol = 2,byrow = TRUE)
+tree_model <- rpart(as.factor(y)~., data = test, method = "class",parms = list(loss = loss_matrix))
+Yfit_f1=predict(tree_model, newdata=test,type="class")
+confusion_M = confusionMatrix(Yfit_f1,test$y)
+confusion_M$table
+ conf_mat$overall["Accuracy"]
+ conf_mat$byClass["F1"]
+```
+According to the data above we can see that F1 scores and Accuracy approximately equal.But in the confusion matrix, increased the predicted value of yes.We can conclude this model is batter.
+
+
+### 6.Optimal tree and a Logistic regression
+
+```{r,echo=FALSE}
+# Train a logistic regression model
+logistic_model <- glm(as.factor(y) ~ ., data = test, family = "binomial")
+optimalTree=prune.tree(fit_c, best=optimal_leaves)
+predictions1 <- predict(logistic_model, newdata = test, type = "response")
+predictions_temp <- predict(optimalTree, newdata = test, type = "vector")
+predictions <- as.data.frame(predictions_temp)$yes
+thresholds <- seq(0.05, 0.95, by = 0.05)
+
+
+confusion_metrics <- function(model, data, threshold, predictions) {
+  predicted_labels <- ifelse(predictions > rep(threshold,length(predictions)), "yes", "no")
+ 
+  
+  TP <- length(which(predicted_labels == data$y & predicted_labels == "yes"))
+  TN <- length(which(predicted_labels == data$y & predicted_labels == "no"))
+  FP<- length(which(predicted_labels != data$y & predicted_labels == "yes"))
+  FN <- length(which(predicted_labels != data$y & predicted_labels == "no"))
+  # cat("y",TP,TN,FP,FN,"\n")
+  TPR <- TP / (TP + FN)
+  FPR <- FP / (FP + TN)
+  return(list(TPR = TPR, FPR = FPR))
+}
+
+tree_TPR<-numeric(length(thresholds))
+tree_FPR<-numeric(length(thresholds))
+logistic_TPR<-numeric(length(thresholds))
+logistic_FPR<-numeric(length(thresholds))
+index<-1
+for (i in seq_along(thresholds)) {
+  
+  confusion_metrics_tree=confusion_metrics(optimal_tree, test, thresholds[i], predictions)
+  tree_TPR[index]=confusion_metrics_tree$TPR
+  tree_FPR[index]=confusion_metrics_tree$FPR
+  
+  confusion_metrics_logistic<- confusion_metrics(logistic_model, test, thresholds[i],predictions1)
+  logistic_TPR[index]=confusion_metrics_logistic$TPR
+  logistic_FPR[index]=confusion_metrics_logistic$FPR
+  index=index+1
+}
+roc_tree <- data.frame(tree_TPR,tree_FPR)
+roc_logistic <- data.frame(logistic_TPR,logistic_FPR)
+
+ggplot(roc_tree,aes(x = tree_FPR, y = tree_TPR)) +
+  geom_line(color = "red")  +
+  xlim(0,1) + ylim(0,1) + labs(title = "ROC Curves", x = "FPR", y = "TPR")+
+geom_line(data=roc_logistic, aes(x = logistic_FPR, y = logistic_TPR), color = "blue")
+
+```
+
+When comparing two plots for the models, we can find that the AUC of the tree model(red curve)is larger than that of glm(blue curve) Here we can conclude tree model is better.
+
+
+# Appendix: All r code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
